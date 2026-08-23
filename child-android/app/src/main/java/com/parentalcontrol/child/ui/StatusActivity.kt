@@ -86,7 +86,7 @@ class StatusActivity : AppCompatActivity() {
     }
 
     private fun updateAccessibilityWarning() {
-        val isA11yRunning = com.parentalcontrol.child.services.ChildAccessibilityService.isRunning()
+        val isA11yRunning = com.parentalcontrol.child.services.ChildAccessibilityService.isAccessibilityEnabled(this)
         if (isA11yRunning) {
             btnFixAccessibility.visibility = android.view.View.GONE
         } else {

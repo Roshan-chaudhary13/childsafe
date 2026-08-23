@@ -19,6 +19,26 @@ class ChildAccessibilityService : AccessibilityService() {
 
         fun isRunning(): Boolean = instance != null
 
+        fun isAccessibilityEnabled(context: android.content.Context): Boolean {
+            if (instance != null) return true
+            return try {
+                val am = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+                val enabledServices = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                val inList = enabledServices?.any {
+                    it.resolveInfo.serviceInfo.packageName == context.packageName
+                } ?: false
+                if (inList) return true
+
+                val settingValue = android.provider.Settings.Secure.getString(
+                    context.contentResolver,
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                ) ?: ""
+                settingValue.contains(context.packageName)
+            } catch (e: Exception) {
+                instance != null
+            }
+        }
+
         fun takeSilentScreenshot(callback: (String?) -> Unit) {
             val service = instance
             if (service == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
