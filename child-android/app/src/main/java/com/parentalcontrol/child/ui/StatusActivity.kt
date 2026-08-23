@@ -86,11 +86,29 @@ class StatusActivity : AppCompatActivity() {
     }
 
     private fun updateAccessibilityWarning() {
-        val isA11yRunning = com.parentalcontrol.child.services.ChildAccessibilityService.isRunning()
-        if (isA11yRunning) {
+        val isRunning = com.parentalcontrol.child.services.ChildAccessibilityService.isRunning() || isAccessibilityEnabledInSettings()
+        if (isRunning) {
             btnFixAccessibility.visibility = android.view.View.GONE
         } else {
             btnFixAccessibility.visibility = android.view.View.VISIBLE
+        }
+    }
+
+    private fun isAccessibilityEnabledInSettings(): Boolean {
+        return try {
+            val accessibilityEnabled = android.provider.Settings.Secure.getInt(
+                contentResolver,
+                android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0
+            ) == 1
+            if (!accessibilityEnabled) return false
+
+            val enabledServices = android.provider.Settings.Secure.getString(
+                contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            enabledServices.contains(packageName)
+        } catch (e: Exception) {
+            false
         }
     }
 }
