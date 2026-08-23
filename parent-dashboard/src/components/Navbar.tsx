@@ -51,7 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               { id: 'overview', label: 'Overview' },
               { id: 'screentime', label: 'Screen Time' },
               { id: 'location', label: 'Location Map' },
-              { id: 'live', label: 'Live Monitor' }
+              { id: 'live', label: 'Remote Access' }
             ].map((tab) => (
               <button
                 key={tab.id}

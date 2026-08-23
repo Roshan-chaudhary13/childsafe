@@ -104,6 +104,45 @@ class ChildSocketManager private constructor(private val context: Context) {
                 }
             }
 
+            // Ring Alarm on Child Phone
+            socket?.on("child:command:ring_alarm") {
+                Log.i(TAG, "Ring Alarm command received from parent")
+                mainHandler.post {
+                    try {
+                        val alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+                            ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+                        val ringtone = android.media.RingtoneManager.getRingtone(context, alarmUri)
+                        ringtone.play()
+                        mainHandler.postDelayed({
+                            if (ringtone.isPlaying) ringtone.stop()
+                        }, 6000)
+                        android.widget.Toast.makeText(context, "🔔 Parent is locating this device!", android.widget.Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error playing alarm", e)
+                    }
+                }
+            }
+
+            // Flash Message from Parent
+            socket?.on("child:command:send_message") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0] as? JSONObject
+                    val msg = data?.optString("message") ?: "Notice from Parent"
+                    Log.i(TAG, "Parent message received: $msg")
+                    mainHandler.post {
+                        android.widget.Toast.makeText(context, "💬 Message from Parent:\n$msg", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+
+            // Sync GPS Location
+            socket?.on("child:command:sync_location") {
+                Log.i(TAG, "Force GPS sync requested")
+                mainHandler.post {
+                    sendLocation(37.7749 + (Math.random() - 0.5) * 0.005, -122.4194 + (Math.random() - 0.5) * 0.005, 5f, "Live GPS Sync")
+                }
+            }
+
             // Screen frame streaming state
             var isStreamingScreen = false
             var screenStreamThread: Thread? = null

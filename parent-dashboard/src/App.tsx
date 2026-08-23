@@ -307,11 +307,13 @@ export function App() {
         {activeTab === 'live' && (
           <LiveMonitorView
             deviceId={selectedDevice.id}
+            device={selectedDevice}
             socket={socket}
             screenshots={screenshots}
             onRequestScreenshot={handleRequestScreenshot}
             onDeleteScreenshot={handleDeleteScreenshot}
             onDeleteAllScreenshots={handleDeleteAllScreenshots}
+            onToggleLock={() => handleToggleLock(selectedDevice)}
           />
         )}
       </main>

@@ -1,49 +1,62 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera,
   Mic,
   Monitor,
   Radio,
   Image as ImageIcon,
-  Play,
   Square,
-  RefreshCw,
-  Eye,
   Volume2,
   VolumeX,
   Trash2,
   CheckSquare,
   Square as CheckboxBlank,
-  X
+  X,
+  Lock,
+  Unlock,
+  Bell,
+  MessageSquare,
+  MapPin,
+  Send,
+  Smartphone
 } from 'lucide-react';
 import { Socket } from 'socket.io-client';
-import { RemoteScreenshot } from '../types';
+import { RemoteScreenshot, ChildDevice } from '../types';
 
 interface LiveMonitorViewProps {
   deviceId: string;
+  device?: ChildDevice | null;
   socket: Socket;
   screenshots: RemoteScreenshot[];
   onRequestScreenshot: () => void;
   onDeleteScreenshot: (id: string) => Promise<void>;
   onDeleteAllScreenshots: () => Promise<void>;
+  onToggleLock?: (device: ChildDevice) => void;
 }
 
 export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
   deviceId,
+  device,
   socket,
   screenshots,
   onRequestScreenshot,
   onDeleteScreenshot,
-  onDeleteAllScreenshots
+  onDeleteAllScreenshots,
+  onToggleLock
 }) => {
   const [activeMediaType, setActiveMediaType] = useState<'screen' | 'camera_front' | 'camera_back' | 'mic' | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [selectedScreenshot, setSelectedScreenshot] = useState<RemoteScreenshot | null>(null);
-  const [streamStatus, setStreamStatus] = useState<string>('Ready');
+  const [streamStatus, setStreamStatus] = useState<string>('Ready for Remote Access');
   const [latestLiveFrame, setLatestLiveFrame] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isRinging, setIsRinging] = useState(false);
+  const [isSyncingGps, setIsSyncingGps] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [messageSentFeedback, setMessageSentFeedback] = useState(false);
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -69,7 +82,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected screenshot(s)?`)) return;
+    if (!window.confirm(Delete ${selectedIds.size} selected screenshot(s)?)) return;
     for (const id of Array.from(selectedIds)) {
       await onDeleteScreenshot(id);
     }
@@ -79,25 +92,48 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
 
   const handleDeleteAll = async () => {
     if (screenshots.length === 0) return;
-    if (!window.confirm(`Are you sure you want to delete ALL ${screenshots.length} screenshots?`)) return;
+    if (!window.confirm(Are you sure you want to delete ALL ${screenshots.length} screenshots?)) return;
     await onDeleteAllScreenshots();
     setSelectedIds(new Set());
     setIsSelectMode(false);
   };
 
-  // WebRTC Setup
-  const startWebRtcStream = (mediaType: 'screen' | 'camera_front' | 'camera_back' | 'mic') => {
+  // Remote Commands
+  const handleRingAlarm = () => {
+    setIsRinging(true);
+    socket.emit('parent:command:ring_alarm', { deviceId });
+    setTimeout(() => setIsRinging(false), 5000);
+  };
+
+  const handleSyncGps = () => {
+    setIsSyncingGps(true);
+    socket.emit('parent:command:sync_location', { deviceId });
+    setTimeout(() => setIsSyncingGps(false), 2000);
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageText.trim()) return;
+    socket.emit('parent:command:send_message', {
+      deviceId,
+      message: messageText.trim()
+    });
+    setMessageText('');
+    setMessageSentFeedback(true);
+    setTimeout(() => setMessageSentFeedback(false), 3000);
+  };
+
+  // Live Stream Setup
+  const startStream = (mediaType: 'screen' | 'camera_front' | 'camera_back' | 'mic') => {
     setActiveMediaType(mediaType);
     setIsStreaming(true);
-    setStreamStatus(`Connecting Live ${mediaType} stream...`);
+    setStreamStatus(Connecting Live ${mediaType}...);
 
-    // Send Stream Request Command to Backend / Child
     socket.emit('webrtc:request_stream', {
       deviceId,
       mediaType
     });
 
-    // Setup WebRTC peer connection for AV
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -115,7 +151,6 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
     };
 
     pc.ontrack = (event) => {
-      console.log('[WebRTC Parent] Received remote stream track:', event.track.kind);
       setStreamStatus('Live Stream Connected 🟢');
       if (event.track.kind === 'video' && remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
@@ -129,11 +164,11 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
     peerConnectionRef.current = pc;
   };
 
-  const stopWebRtcStream = () => {
+  const stopStream = () => {
     setIsStreaming(false);
     setActiveMediaType(null);
     setLatestLiveFrame(null);
-    setStreamStatus('Stopped');
+    setStreamStatus('Ready for Remote Access');
     socket.emit('webrtc:stop_stream', { deviceId });
 
     if (peerConnectionRef.current) {
@@ -149,55 +184,17 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
   };
 
   useEffect(() => {
-    // Listen for high-speed live screen frame mirror from child
     const handleScreenFrame = (data: { deviceId: string; frame: string }) => {
       setLatestLiveFrame(data.frame);
-      setStreamStatus('Live Screen Connected 🟢 (Real-time)');
-    };
-
-    // Listen for WebRTC Offer from Child
-    const handleOffer = async (data: { sdp: RTCSessionDescriptionInit; mediaType: string }) => {
-      console.log('[WebRTC Parent] Received SDP Offer from child:', data);
-      const pc = peerConnectionRef.current;
-      if (!pc) return;
-
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        socket.emit('webrtc:answer', {
-          deviceId,
-          sdp: answer
-        });
-      } catch (err) {
-        console.error('Error handling SDP offer:', err);
-      }
-    };
-
-    // Listen for ICE Candidate from Child
-    const handleCandidate = async (data: { candidate: RTCIceCandidateInit }) => {
-      const pc = peerConnectionRef.current;
-      if (!pc || !data.candidate) return;
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-      } catch (err) {
-        console.error('Error adding ICE candidate:', err);
-      }
+      setStreamStatus('Live Screen Mirror Connected 🟢');
     };
 
     socket.on('parent:screen_frame', handleScreenFrame);
-    socket.on('webrtc:offer', handleOffer);
-    socket.on('webrtc:ice_candidate', handleCandidate);
 
     return () => {
       socket.off('parent:screen_frame', handleScreenFrame);
-      socket.off('webrtc:offer', handleOffer);
-      socket.off('webrtc:ice_candidate', handleCandidate);
     };
   }, [socket, deviceId]);
-
-  const [isCapturing, setIsCapturing] = useState(false);
 
   const handleCaptureClick = async () => {
     if (isCapturing) return;
@@ -214,50 +211,147 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Radio className="w-5 h-5 text-rose-400" />
-            Live Remote Monitoring &amp; Safety Stream
+            <Radio className="w-5 h-5 text-sky-400" />
+            Remote Access &amp; Control
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time WebRTC audio/video streaming &amp; on-demand remote screenshots.
+            Access child screen live anytime, trigger instant remote actions, and view captures.
           </p>
         </div>
 
-        {/* Remote Screenshot Button */}
-        <button
-          onClick={handleCaptureClick}
-          disabled={isCapturing}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-rose-500 to-amber-600 hover:from-rose-400 hover:to-amber-500 disabled:opacity-60 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-500/20 transition-all cursor-pointer"
-        >
-          {isCapturing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Capturing Screen...
-            </>
-          ) : (
-            <>
-              <Camera className="w-4 h-4" />
-              Capture Remote Screenshot
-            </>
-          )}
-        </button>
+        {/* Action Header Button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleCaptureClick}
+            disabled={isCapturing}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-60 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-500/20 transition-all cursor-pointer"
+          >
+            {isCapturing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Capturing...
+              </>
+            ) : (
+              <>
+                <Camera className="w-4 h-4" />
+                Capture Screenshot
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Main Monitoring Workspace */}
+      {/* Instant Remote Command Deck */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* 1. Remote Lock */}
+        {device && onToggleLock && (
+          <button
+            onClick={() => onToggleLock(device)}
+            className={p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
+              device.isLocked
+                ? 'bg-rose-950/30 border-rose-500/50 hover:bg-rose-950/40 text-rose-300'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-200'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className={p-2 rounded-xl ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-800 text-sky-400'}}>
+                {device.isLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
+              </div>
+              <span className={	ext-[10px] font-bold px-2 py-0.5 rounded-full ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}}>
+                {device.isLocked ? 'LOCKED' : 'ACTIVE'}
+              </span>
+            </div>
+            <div>
+              <div className="text-xs font-bold">{device.isLocked ? 'Unlock Phone' : 'Lock Phone'}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Instant lockout overlay</div>
+            </div>
+          </button>
+        )}
+
+        {/* 2. Ring Lost Phone */}
+        <button
+          onClick={handleRingAlarm}
+          disabled={isRinging}
+          className="p-4 rounded-2xl border bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-200 text-left flex flex-col justify-between gap-3 transition-all cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+              <Bell className={w-5 h-5 ${isRinging ? 'animate-bounce' : ''}} />
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+              ALARM
+            </span>
+          </div>
+          <div>
+            <div className="text-xs font-bold">{isRinging ? 'Ringing Device...' : 'Ring Lost Phone'}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Loud sound even if silent</div>
+          </div>
+        </button>
+
+        {/* 3. Force GPS Sync */}
+        <button
+          onClick={handleSyncGps}
+          disabled={isSyncingGps}
+          className="p-4 rounded-2xl border bg-slate-900 border-slate-800 hover:border-emerald-500/50 text-slate-200 text-left flex flex-col justify-between gap-3 transition-all cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <MapPin className={w-5 h-5 ${isSyncingGps ? 'animate-spin' : ''}} />
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+              GPS
+            </span>
+          </div>
+          <div>
+            <div className="text-xs font-bold">{isSyncingGps ? 'Syncing Pin...' : 'Force GPS Sync'}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Request live location</div>
+          </div>
+        </button>
+
+        {/* 4. Send Notice Form */}
+        <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+            <MessageSquare className="w-4 h-4 text-sky-400" />
+            Send Notice
+          </div>
+          <form onSubmit={handleSendMessage} className="flex gap-1.5">
+            <input
+              type="text"
+              placeholder="Message child..."
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+            />
+            <button
+              type="submit"
+              className="p-2 bg-sky-500 hover:bg-sky-400 text-white rounded-lg text-xs cursor-pointer transition-colors"
+              title="Send notice to phone"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+          <div className="text-[10px] text-slate-400">
+            {messageSentFeedback ? <span className="text-emerald-400 font-semibold">Sent to screen!</span> : 'Pops up alert on child screen'}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Stream & Gallery Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left 2 Cols: Live WebRTC Stream Viewer */}
+        {/* Left 2 Cols: Live Video Console */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-rose-500 animate-ping' : 'bg-slate-600'}`} />
-              <h3 className="text-sm font-bold text-white">Live Stream Console</h3>
+              <span className={w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}} />
+              <h3 className="text-sm font-bold text-white">Live Remote Console</h3>
             </div>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
               {streamStatus}
             </span>
           </div>
 
-          {/* Video Player Box */}
+          {/* Video / Mirror Display */}
           <div className="relative aspect-video bg-slate-950 rounded-2xl border border-slate-800/90 overflow-hidden flex items-center justify-center">
             {isStreaming ? (
               latestLiveFrame ? (
@@ -267,32 +361,31 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                     alt="Live Screen Stream"
                     className="w-full h-full object-contain select-none"
                   />
-                  <div className="absolute top-3 left-3 bg-emerald-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur">
+                  <div className="absolute top-3 left-3 bg-emerald-500/90 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                    LIVE STREAM ACTIVE
+                    LIVE MIRROR ACTIVE
                   </div>
                 </div>
               ) : (
                 <div className="text-center p-6 space-y-3">
-                  <div className="w-10 h-10 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-rose-400">Connecting Live Stream...</p>
-                  <p className="text-xs text-slate-500">Awaiting direct video frame stream from device</p>
+                  <div className="w-10 h-10 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-sm font-semibold text-sky-400">Streaming Remote Screen...</p>
+                  <p className="text-xs text-slate-500">Establishing direct frame transfer with child device</p>
                 </div>
               )
             ) : (
               <div className="text-center p-6 space-y-2">
-                <Radio className="w-12 h-12 text-slate-700 mx-auto" />
-                <p className="text-sm font-semibold text-slate-400">Stream Inactive</p>
-                <p className="text-xs text-slate-600 max-w-sm">
-                  Select a live feed below (Camera, Screen Share, or Microphone) to establish secure WebRTC peer connection.
+                <Smartphone className="w-12 h-12 text-slate-700 mx-auto" />
+                <p className="text-sm font-semibold text-slate-300">Remote Screen Inactive</p>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  Click <strong>"Live Screen Mirror"</strong> below to view child's screen in real time anytime.
                 </p>
               </div>
             )}
 
-            {/* Hidden audio element for audio-only mic stream */}
             <audio ref={remoteAudioRef} autoPlay muted={isMuted} />
 
-            {/* On-video Control Bar */}
+            {/* On-video Floating Bar */}
             {isStreaming && (
               <div className="absolute bottom-3 left-3 right-3 bg-slate-900/90 backdrop-blur border border-slate-800 px-4 py-2 rounded-xl flex items-center justify-between text-xs">
                 <span className="font-semibold text-white uppercase text-[11px] tracking-wider">
@@ -307,7 +400,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                     {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
                   </button>
                   <button
-                    onClick={stopWebRtcStream}
+                    onClick={stopStream}
                     className="px-3 py-1 bg-rose-500 hover:bg-rose-400 text-white rounded-lg font-bold flex items-center gap-1 cursor-pointer"
                   >
                     <Square className="w-3.5 h-3.5" /> Stop Stream
@@ -317,27 +410,27 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
             )}
           </div>
 
-          {/* Stream Selector Buttons */}
+          {/* Stream Switcher Buttons */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
             {[
-              { id: 'screen', label: 'Screen Share', icon: Monitor },
+              { id: 'screen', label: 'Live Screen Mirror', icon: Monitor },
               { id: 'camera_front', label: 'Front Camera', icon: Camera },
               { id: 'camera_back', label: 'Rear Camera', icon: Camera },
-              { id: 'mic', label: 'Live Audio', icon: Mic }
+              { id: 'mic', label: 'Surround Audio', icon: Mic }
             ].map((stream) => {
               const Icon = stream.icon;
               const isSelected = activeMediaType === stream.id && isStreaming;
               return (
                 <button
                   key={stream.id}
-                  onClick={() => (isSelected ? stopWebRtcStream() : startWebRtcStream(stream.id as any))}
-                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                  onClick={() => (isSelected ? stopStream() : startStream(stream.id as any))}
+                  className={p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-rose-500/20 border-rose-500 text-rose-300 shadow-md shadow-rose-500/20'
+                      ? 'bg-sky-500/20 border-sky-500 text-sky-300 shadow-md shadow-sky-500/20'
                       : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
-                  }`}
+                  }}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 text-sky-400" />
                   {stream.label}
                 </button>
               );
@@ -345,12 +438,12 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
           </div>
         </div>
 
-        {/* Right 1 Col: Remote Screenshots Gallery */}
+        {/* Right 1 Col: Screenshot Evidence Gallery */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 flex flex-col">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-amber-400" />
-              Screenshot Gallery
+              Screenshots
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400 font-mono">
@@ -359,9 +452,9 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
               {screenshots.length > 0 && (
                 <button
                   onClick={() => setIsSelectMode(!isSelectMode)}
-                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                  className={px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
                     isSelectMode ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                  }`}
+                  }}
                 >
                   {isSelectMode ? 'Cancel' : 'Select'}
                 </button>
@@ -407,7 +500,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
           <div className="flex-1 overflow-y-auto space-y-3 max-h-[500px] pr-1">
             {screenshots.length === 0 ? (
               <div className="text-center py-12 text-slate-500 text-xs italic">
-                No screenshots captured yet. Click "Capture Remote Screenshot" above.
+                No screenshots captured yet. Click "Capture Screenshot" above.
               </div>
             ) : (
               screenshots.map((shot) => {
@@ -416,11 +509,11 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                   <div
                     key={shot.id}
                     onClick={() => (isSelectMode ? toggleSelect(shot.id, { stopPropagation: () => {} } as any) : setSelectedScreenshot(shot))}
-                    className={`group relative bg-slate-950 border rounded-xl overflow-hidden cursor-pointer transition-all ${
+                    className={group relative bg-slate-950 border rounded-xl overflow-hidden cursor-pointer transition-all ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/30'
-                        : 'border-slate-800 hover:border-amber-500/50'
-                    }`}
+                        : 'border-slate-800 hover:border-sky-500/50'
+                    }}
                   >
                     {isSelectMode && (
                       <div
@@ -431,7 +524,6 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                       </div>
                     )}
                     
-                    {/* Hover delete button */}
                     {!isSelectMode && (
                       <button
                         onClick={async (e) => {

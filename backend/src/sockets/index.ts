@@ -131,31 +131,29 @@ export function setupSockets(io: Server) {
       io.to(`parent:${data.deviceId}`).emit('parent:lock_state_changed', { deviceId: data.deviceId, isLocked: data.lock });
     });
 
-function captureRealDeviceScreen(): Promise<string | null> {
-  return new Promise((resolve) => {
-    const adbPath = 'C:\\Program Files\\Netease\\MuMuPlayer\\nx_main\\adb.exe';
-    exec(`"${adbPath}" -s 127.0.0.1:7555 exec-out screencap -p`, { encoding: 'buffer', maxBuffer: 15 * 1024 * 1024 }, (err, stdout) => {
-      if (err || !stdout || stdout.length < 1000) {
-        // Try without -s
-        exec(`"${adbPath}" exec-out screencap -p`, { encoding: 'buffer', maxBuffer: 15 * 1024 * 1024 }, (err2, stdout2) => {
-          if (err2 || !stdout2 || stdout2.length < 1000) {
-            resolve(null);
-          } else {
-            resolve(`data:image/png;base64,${stdout2.toString('base64')}`);
-          }
-        });
-      } else {
-        resolve(`data:image/png;base64,${stdout.toString('base64')}`);
-      }
+    // Command: Ring Alarm on Child Phone
+    socket.on('parent:command:ring_alarm', (data: { deviceId: string }) => {
+      console.log(`[Command] Ringing loud alarm on child device: ${data.deviceId}`);
+      emitToChild(data.deviceId, 'child:command:ring_alarm');
     });
-  });
-}
+
+    // Command: Send Flash Message / Notice to Child Phone
+    socket.on('parent:command:send_message', (data: { deviceId: string; message: string }) => {
+      console.log(`[Command] Sending message to child ${data.deviceId}: ${data.message}`);
+      emitToChild(data.deviceId, 'child:command:send_message', { message: data.message });
+    });
 
     // Command: Take Instant Screenshot
     socket.on('parent:command:take_screenshot', (data: { deviceId: string }) => {
       const targetId = store.getDeviceById(data.deviceId)?.id || data.deviceId;
       console.log(`[Command] Requesting screenshot from child: ${data.deviceId} -> target: ${targetId}`);
       emitToChild(data.deviceId, 'child:command:take_screenshot');
+    });
+
+    // Command: Force GPS Location Sync
+    socket.on('parent:command:sync_location', (data: { deviceId: string }) => {
+      console.log(`[Command] Force syncing GPS for child: ${data.deviceId}`);
+      emitToChild(data.deviceId, 'child:command:sync_location');
     });
 
     // Command: Policy Updated
