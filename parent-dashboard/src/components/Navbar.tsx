@@ -51,7 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               { id: 'overview', label: 'Overview' },
               { id: 'screentime', label: 'Screen Time' },
               { id: 'location', label: 'Location Map' },
-              { id: 'live', label: 'Remote Access' }
+              { id: 'live', label: 'Live Monitor' },
+              { id: 'remote', label: 'Remote Access' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -128,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Navigation Tabs */}
         <div className="flex md:hidden items-center justify-around py-2 border-t border-slate-800/80 overflow-x-auto gap-2">
-          {['overview', 'screentime', 'location', 'live'].map((tab) => (
+          {['overview', 'screentime', 'location', 'live', 'remote'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -136,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 activeTab === tab ? 'bg-sky-500 text-white' : 'text-slate-400'
               }`}
             >
-              {tab}
+              {tab === 'remote' ? 'Remote' : tab}
             </button>
           ))}
         </div>

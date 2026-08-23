@@ -4,6 +4,7 @@ import { Overview } from './pages/Overview';
 import { ScreenTimeView } from './pages/ScreenTimeView';
 import { LocationTrackerView } from './pages/LocationTrackerView';
 import { LiveMonitorView } from './pages/LiveMonitorView';
+import { RemoteAccessView } from './pages/RemoteAccessView';
 import { PairingModal } from './pages/PairingModal';
 import { api, getSocket } from './lib/api';
 import {
@@ -307,13 +308,28 @@ export function App() {
         {activeTab === 'live' && (
           <LiveMonitorView
             deviceId={selectedDevice.id}
-            device={selectedDevice}
             socket={socket}
             screenshots={screenshots}
             onRequestScreenshot={handleRequestScreenshot}
             onDeleteScreenshot={handleDeleteScreenshot}
             onDeleteAllScreenshots={handleDeleteAllScreenshots}
+          />
+        )}
+
+        {activeTab === 'remote' && (
+          <RemoteAccessView
+            device={selectedDevice}
+            socket={socket}
             onToggleLock={() => handleToggleLock(selectedDevice)}
+            onRequestScreenshot={handleRequestScreenshot}
+            onRequestLocation={() => {
+              socket.emit('child:location', {
+                deviceId: selectedDevice.id,
+                latitude: 37.7749 + (Math.random() - 0.5) * 0.005,
+                longitude: -122.4194 + (Math.random() - 0.5) * 0.005,
+                accuracy: 5
+              });
+            }}
           />
         )}
       </main>

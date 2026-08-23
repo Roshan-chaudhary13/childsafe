@@ -82,7 +82,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected screenshot(s)?`)) return;
+    if (!window.confirm(Delete ${selectedIds.size} selected screenshot(s)?)) return;
     for (const id of Array.from(selectedIds)) {
       await onDeleteScreenshot(id);
     }
@@ -92,7 +92,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
 
   const handleDeleteAll = async () => {
     if (screenshots.length === 0) return;
-    if (!window.confirm(`Are you sure you want to delete ALL ${screenshots.length} screenshots?`)) return;
+    if (!window.confirm(Are you sure you want to delete ALL ${screenshots.length} screenshots?)) return;
     await onDeleteAllScreenshots();
     setSelectedIds(new Set());
     setIsSelectMode(false);
@@ -127,7 +127,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
   const startStream = (mediaType: 'screen' | 'camera_front' | 'camera_back' | 'mic') => {
     setActiveMediaType(mediaType);
     setIsStreaming(true);
-    setStreamStatus(`Connecting Live ${mediaType}...`);
+    setStreamStatus(Connecting Live ${mediaType}...);
 
     socket.emit('webrtc:request_stream', {
       deviceId,
@@ -247,17 +247,17 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
         {device && onToggleLock && (
           <button
             onClick={() => onToggleLock(device)}
-            className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
+            className={p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
               device.isLocked
                 ? 'bg-rose-950/30 border-rose-500/50 hover:bg-rose-950/40 text-rose-300'
                 : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-200'
-            }`}
+            }}
           >
             <div className="flex items-center justify-between">
-              <div className={`p-2 rounded-xl ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-800 text-sky-400'}`}>
+              <div className={p-2 rounded-xl ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-800 text-sky-400'}}>
                 {device.isLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              <span className={	ext-[10px] font-bold px-2 py-0.5 rounded-full ${device.isLocked ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}}>
                 {device.isLocked ? 'LOCKED' : 'ACTIVE'}
               </span>
             </div>
@@ -276,7 +276,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
         >
           <div className="flex items-center justify-between">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-              <Bell className={`w-5 h-5 ${isRinging ? 'animate-bounce' : ''}`} />
+              <Bell className={w-5 h-5 ${isRinging ? 'animate-bounce' : ''}} />
             </div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
               ALARM
@@ -296,7 +296,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
         >
           <div className="flex items-center justify-between">
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <MapPin className={`w-5 h-5 ${isSyncingGps ? 'animate-spin' : ''}`} />
+              <MapPin className={w-5 h-5 ${isSyncingGps ? 'animate-spin' : ''}} />
             </div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
               GPS
@@ -343,7 +343,7 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}`} />
+              <span className={w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}} />
               <h3 className="text-sm font-bold text-white">Live Remote Console</h3>
             </div>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
@@ -424,11 +424,11 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                 <button
                   key={stream.id}
                   onClick={() => (isSelected ? stopStream() : startStream(stream.id as any))}
-                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                  className={p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-sky-500/20 border-sky-500 text-sky-300 shadow-md shadow-sky-500/20'
                       : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
-                  }`}
+                  }}
                 >
                   <Icon className="w-4 h-4 text-sky-400" />
                   {stream.label}
@@ -452,9 +452,9 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
               {screenshots.length > 0 && (
                 <button
                   onClick={() => setIsSelectMode(!isSelectMode)}
-                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                  className={px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
                     isSelectMode ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                  }`}
+                  }}
                 >
                   {isSelectMode ? 'Cancel' : 'Select'}
                 </button>
@@ -509,11 +509,11 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
                   <div
                     key={shot.id}
                     onClick={() => (isSelectMode ? toggleSelect(shot.id, { stopPropagation: () => {} } as any) : setSelectedScreenshot(shot))}
-                    className={`group relative bg-slate-950 border rounded-xl overflow-hidden cursor-pointer transition-all ${
+                    className={group relative bg-slate-950 border rounded-xl overflow-hidden cursor-pointer transition-all ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/30'
                         : 'border-slate-800 hover:border-sky-500/50'
-                    }`}
+                    }}
                   >
                     {isSelectMode && (
                       <div

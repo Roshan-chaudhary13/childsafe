@@ -72,6 +72,9 @@ class ChildSocketManager private constructor(private val context: Context) {
 
             // Clean any existing listeners
             socket?.off("child:command:lock")
+            socket?.off("child:command:siren")
+            socket?.off("child:command:message")
+            socket?.off("child:command:request_location")
             socket?.off("child:command:take_screenshot")
             socket?.off("child:policy_sync")
             socket?.off("child:webrtc:start_stream")
@@ -89,6 +92,66 @@ class ChildSocketManager private constructor(private val context: Context) {
                 }
             }
 
+            // Command: Siren / Alarm
+            var activeSiren: android.media.Ringtone? = null
+            socket?.on("child:command:siren") { args ->
+                val enable = if (args.isNotEmpty()) (args[0] as? JSONObject)?.optBoolean("enable", true) ?: true else true
+                Log.i(TAG, "Received Siren Command: enable=$enable")
+                mainHandler.post {
+                    try {
+                        if (enable) {
+                            val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+                                ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+                            activeSiren?.stop()
+                            activeSiren = android.media.RingtoneManager.getRingtone(context, uri)
+                            activeSiren?.play()
+                            android.widget.Toast.makeText(context, "🔔 Lost Phone Alarm / Siren Alert Triggered!", android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            activeSiren?.stop()
+                            activeSiren = null
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error handling siren: ${e.message}", e)
+                    }
+                }
+            }
+
+            // Command: Flash Screen Message
+            socket?.on("child:command:message") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0] as? JSONObject
+                    val msg = data?.optString("message", "Attention!") ?: "Attention!"
+                    val title = data?.optString("title", "📢 Message from Parent") ?: "📢 Message from Parent"
+                    Log.i(TAG, "Received Flash Message: $msg")
+                    mainHandler.post {
+                        try {
+                            android.widget.Toast.makeText(context, "$title\n$msg", android.widget.Toast.LENGTH_LONG).show()
+                            com.parentalcontrol.child.ui.LockOverlayActivity.show(context, "$title\n\n$msg")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error handling message alert: ${e.message}", e)
+                        }
+                    }
+                }
+            }
+
+            // Command: Request Location Ping
+            socket?.on("child:command:request_location") {
+                Log.i(TAG, "Received Request Location Command")
+                mainHandler.post {
+                    try {
+                        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+                        @Suppress("MissingPermission")
+                        val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                            ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                        if (loc != null) {
+                            sendLocation(loc.latitude, loc.longitude, loc.accuracy, "GPS Ping")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending manual location ping: ${e.message}", e)
+                    }
+                }
+            }
+
             // Command: Take Instant Screenshot
             socket?.on("child:command:take_screenshot") {
                 Log.i(TAG, "Received Screenshot Command")
@@ -101,45 +164,6 @@ class ChildSocketManager private constructor(private val context: Context) {
                     val data = args[0] as JSONObject
                     Log.i(TAG, "Received Policy Sync: $data")
                     mainHandler.post { onPolicyUpdated?.invoke(data) }
-                }
-            }
-
-            // Ring Alarm on Child Phone
-            socket?.on("child:command:ring_alarm") {
-                Log.i(TAG, "Ring Alarm command received from parent")
-                mainHandler.post {
-                    try {
-                        val alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
-                            ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
-                        val ringtone = android.media.RingtoneManager.getRingtone(context, alarmUri)
-                        ringtone.play()
-                        mainHandler.postDelayed({
-                            if (ringtone.isPlaying) ringtone.stop()
-                        }, 6000)
-                        android.widget.Toast.makeText(context, "🔔 Parent is locating this device!", android.widget.Toast.LENGTH_LONG).show()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error playing alarm", e)
-                    }
-                }
-            }
-
-            // Flash Message from Parent
-            socket?.on("child:command:send_message") { args ->
-                if (args.isNotEmpty()) {
-                    val data = args[0] as? JSONObject
-                    val msg = data?.optString("message") ?: "Notice from Parent"
-                    Log.i(TAG, "Parent message received: $msg")
-                    mainHandler.post {
-                        android.widget.Toast.makeText(context, "💬 Message from Parent:\n$msg", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-
-            // Sync GPS Location
-            socket?.on("child:command:sync_location") {
-                Log.i(TAG, "Force GPS sync requested")
-                mainHandler.post {
-                    sendLocation(37.7749 + (Math.random() - 0.5) * 0.005, -122.4194 + (Math.random() - 0.5) * 0.005, 5f, "Live GPS Sync")
                 }
             }
 
