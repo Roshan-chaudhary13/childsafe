@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Radio, 
   Lock, 
@@ -8,16 +8,11 @@ import {
   Camera, 
   MapPin, 
   Battery, 
-  Wifi, 
   ShieldCheck, 
   Terminal, 
-  Smartphone,
-  RefreshCw,
-  Send,
-  Volume2,
-  VolumeX,
-  CheckCircle2,
-  AlertCircle
+  Smartphone, 
+  Send, 
+  Volume2 
 } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import { ChildDevice } from '../types';
@@ -34,7 +29,7 @@ interface CommandLog {
   id: string;
   timestamp: string;
   command: string;
-  status: 'sent' | 'ack' | 'failed';
+  status: string;
   details?: string;
 }
 
@@ -54,7 +49,7 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
       timestamp: new Date().toLocaleTimeString(),
       command: 'SYSTEM_INIT',
       status: 'ack',
-      details: Connected to  ()
+      details: `Connected to ${device.name} (${device.id})`
     }
   ]);
 
@@ -88,11 +83,11 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
     setIsSendingMessage(true);
     socket?.emit('parent:command:send_message', {
       deviceId: device.id,
-      title: '📢 Urgent Message from Parent',
+      title: 'Urgent Message from Parent',
       message: flashMessage.trim()
     });
 
-    addLog('FLASH_MESSAGE', "");
+    addLog('FLASH_MESSAGE', flashMessage.trim());
     setFlashMessage('');
     setTimeout(() => setIsSendingMessage(false), 800);
   };
@@ -115,7 +110,6 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -123,10 +117,9 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
             Remote Access &amp; Device Control
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Execute real-time remote commands, triggers alarms, send instant screen alerts, and audit device telemetry.
+            Execute real-time remote commands, trigger alarms, send instant screen alerts, and audit device telemetry.
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
@@ -135,13 +128,8 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
         </div>
       </div>
 
-      {/* Grid: Remote Commands & Hardware Telemetry */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Quick Remote Action Cards */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Action Button Grid */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Terminal className="w-4 h-4 text-sky-400" />
@@ -149,11 +137,13 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              {/* Remote Lock / Unlock */}
               <button
                 onClick={handleManualLock}
-                className={p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between }
+                className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  device.isLocked
+                    ? 'bg-red-950/20 border-red-500/40 text-red-300 hover:bg-red-950/40'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-200 hover:border-sky-500/50'
+                }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Lockout Control</span>
@@ -169,10 +159,13 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
                 </div>
               </button>
 
-              {/* Siren Alarm */}
               <button
                 onClick={handleToggleSiren}
-                className={p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between }
+                className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  isSirenActive
+                    ? 'bg-amber-950/20 border-amber-500/40 text-amber-300 hover:bg-amber-950/40'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-200 hover:border-amber-500/50'
+                }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Lost Phone Alert</span>
@@ -188,7 +181,6 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
                 </div>
               </button>
 
-              {/* Instant Screen Snapshot */}
               <button
                 onClick={handleSnapshot}
                 className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 hover:border-indigo-500/50 text-left transition-all cursor-pointer flex flex-col justify-between"
@@ -205,7 +197,6 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
                 </div>
               </button>
 
-              {/* Force GPS Ping */}
               <button
                 onClick={handleLocationPing}
                 className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 hover:border-emerald-500/50 text-left transition-all cursor-pointer flex flex-col justify-between"
@@ -221,18 +212,16 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
                   </div>
                 </div>
               </button>
-
             </div>
           </div>
 
-          {/* Flash Screen Message Form */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-sky-400" />
               Send Flash Screen Notice
             </h3>
             <p className="text-xs text-slate-400">
-              Dispatches an urgent popup alert directly over the child's screen (e.g. "Come home now", "Call dad").
+              Dispatches an urgent popup alert directly over the child screen.
             </p>
 
             <form onSubmit={handleSendFlashMessage} className="flex gap-2">
@@ -253,13 +242,9 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
               </button>
             </form>
           </div>
-
         </div>
 
-        {/* Right Column: Telemetry & Live Command Log */}
         <div className="space-y-6">
-          
-          {/* Device Telemetry Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-sky-400" />
@@ -273,7 +258,7 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
               </div>
               <div className="flex justify-between py-2 border-b border-slate-800/60">
                 <span className="text-slate-400">Status</span>
-                <span className={ont-semibold flex items-center gap-1 }>
+                <span className={`font-semibold flex items-center gap-1 ${device.status === 'online' ? 'text-emerald-400' : 'text-slate-400'}`}>
                   {device.status === 'online' ? '🟢 Online (Protected)' : '⚪ Offline'}
                 </span>
               </div>
@@ -297,7 +282,6 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
             </div>
           </div>
 
-          {/* Live Command Dispatcher Log */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -320,9 +304,7 @@ export const RemoteAccessView: React.FC<RemoteAccessViewProps> = ({
               ))}
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );
