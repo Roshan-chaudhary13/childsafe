@@ -31,7 +31,7 @@ class StatusActivity : AppCompatActivity() {
         btnHideApp = findViewById(R.id.btnHideApp)
 
         val prefs = getSharedPreferences("parental_prefs", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("device_id", "child-demo-01")
+        val deviceId = prefs.getString("device_id", "child-220835") ?: "child-220835"
 
         // Ensure Foreground Safety Service is running
         com.parentalcontrol.child.services.ForegroundSafetyService.start(this)

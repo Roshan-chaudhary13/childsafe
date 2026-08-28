@@ -69,7 +69,7 @@ class ForegroundSafetyService : Service() {
 
         // 1. Initialize Network & Socket Manager
         val sharedPrefs = getSharedPreferences("parental_prefs", Context.MODE_PRIVATE)
-        val backendUrl = sharedPrefs.getString("backend_url", "http://192.168.1.5:4000") ?: "http://192.168.1.5:4000"
+        val backendUrl = sharedPrefs.getString("backend_url", "https://api.roshan-chaudhary.in") ?: "https://api.roshan-chaudhary.in"
         val deviceId = sharedPrefs.getString("device_id", "child-220835") ?: "child-220835"
 
         Log.i(TAG, "Connecting socket to backendUrl=$backendUrl with deviceId=$deviceId")
