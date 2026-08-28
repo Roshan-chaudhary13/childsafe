@@ -23,14 +23,31 @@ export function setupSockets(io: Server) {
       socket.join(`device:${deviceId}`);
       
       if (clientType === 'child') {
+        const matched = store.getDeviceById(deviceId);
+        const resolvedId = matched ? matched.id : deviceId;
+        socket.join(`child:${resolvedId}`);
         socket.join(`child:${deviceId}`);
-        store.updateDevice(deviceId, { status: 'online', isPaired: true, lastSeen: new Date().toISOString() });
-        io.to(`device:${deviceId}`).emit('device:status', { deviceId, status: 'online' });
-        io.to(`parent:${deviceId}`).emit('device:status', { deviceId, status: 'online' });
+        store.updateDevice(resolvedId, { status: 'online', isPaired: true, lastSeen: new Date().toISOString() });
+        
+        io.emit('device:status', { deviceId: resolvedId, status: 'online' });
+        io.emit('device:status', { deviceId: deviceId, status: 'online' });
       } else if (clientType === 'parent') {
+        socket.join('parent:all');
+        const matched = store.getDeviceById(deviceId);
+        const resolvedId = matched ? matched.id : deviceId;
+        socket.join(`parent:${resolvedId}`);
         socket.join(`parent:${deviceId}`);
       }
     }
+
+    // Parent dynamic device room subscription
+    socket.on('parent:select_device', (data: { deviceId: string }) => {
+      if (!data?.deviceId) return;
+      const dev = store.getDeviceById(data.deviceId);
+      const target = dev ? dev.id : data.deviceId;
+      socket.join(`parent:${target}`);
+      socket.join(`parent:${data.deviceId}`);
+    });
 
     // 1. Child Telemetry & Health Updates
     socket.on('child:telemetry', (data: { deviceId: string; batteryLevel: number; isCharging: boolean; activeApp?: string }) => {
@@ -42,8 +59,9 @@ export function setupSockets(io: Server) {
         status: 'online'
       });
       // Forward to parent dashboard
-      io.to(`parent:${targetId}`).emit('parent:telemetry_update', { ...data, deviceId: targetId });
-      io.to(`parent:${data.deviceId}`).emit('parent:telemetry_update', { ...data, deviceId: targetId });
+      io.emit('parent:telemetry_update', { ...data, deviceId: targetId });
+      io.emit('device:status', { deviceId: targetId, status: 'online' });
+      io.emit('device:status', { deviceId: data.deviceId, status: 'online' });
     });
 
     // 2. Child Location Ping
@@ -59,8 +77,7 @@ export function setupSockets(io: Server) {
         address: data.address
       };
       store.addLocation(locPoint);
-      io.to(`parent:${targetId}`).emit('parent:location_update', locPoint);
-      io.to(`parent:${data.deviceId}`).emit('parent:location_update', locPoint);
+      io.emit('parent:location_update', locPoint);
     });
 
     // 3. Child App Usage Sync
@@ -234,8 +251,11 @@ function captureRealDeviceScreen(): Promise<string | null> {
     socket.on('disconnect', () => {
       console.log(`[Socket Disconnected] ${socket.id}`);
       if (deviceId && clientType === 'child') {
-        store.updateDevice(deviceId, { status: 'offline', lastSeen: new Date().toISOString() });
-        io.to(`parent:${deviceId}`).emit('device:status', { deviceId, status: 'offline' });
+        const matched = store.getDeviceById(deviceId);
+        const resolvedId = matched ? matched.id : deviceId;
+        store.updateDevice(resolvedId, { status: 'offline', lastSeen: new Date().toISOString() });
+        io.emit('device:status', { deviceId: resolvedId, status: 'offline' });
+        io.emit('device:status', { deviceId: deviceId, status: 'offline' });
       }
     });
   });

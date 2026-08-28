@@ -59,6 +59,7 @@ export function App() {
 
     async function loadData() {
       try {
+        socket.emit('parent:select_device', { deviceId: devId });
         const [st, wf, locs, usage, shots, alts] = await Promise.all([
           api.getScreenTime(devId),
           api.getWebFilter(devId),
@@ -80,7 +81,7 @@ export function App() {
     }
 
     loadData();
-  }, [selectedDevice?.id]);
+  }, [selectedDevice?.id, socket]);
 
   // Socket Realtime Listeners
   useEffect(() => {
