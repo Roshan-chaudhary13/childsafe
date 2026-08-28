@@ -86,22 +86,26 @@ class StatusActivity : AppCompatActivity() {
     }
 
     private fun updateAccessibilityWarning() {
-        val isRunning = com.parentalcontrol.child.services.ChildAccessibilityService.isRunning() || isAccessibilityEnabledInSettings()
-        if (isRunning) {
-            btnFixAccessibility.visibility = android.view.View.GONE
-        } else {
-            btnFixAccessibility.visibility = android.view.View.VISIBLE
-        }
+        val isRunning = isAccessibilityEnabled()
+        btnFixAccessibility.visibility = if (isRunning) android.view.View.GONE else android.view.View.VISIBLE
     }
 
-    private fun isAccessibilityEnabledInSettings(): Boolean {
-        return try {
-            val accessibilityEnabled = android.provider.Settings.Secure.getInt(
-                contentResolver,
-                android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0
-            ) == 1
-            if (!accessibilityEnabled) return false
+    private fun isAccessibilityEnabled(): Boolean {
+        if (com.parentalcontrol.child.services.ChildAccessibilityService.isRunning()) return true
 
+        try {
+            val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+            if (am != null) {
+                val enabledServices = am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                for (service in enabledServices) {
+                    if (service.resolveInfo?.serviceInfo?.packageName == packageName) {
+                        return true
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        return try {
             val enabledServices = android.provider.Settings.Secure.getString(
                 contentResolver,
                 android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
