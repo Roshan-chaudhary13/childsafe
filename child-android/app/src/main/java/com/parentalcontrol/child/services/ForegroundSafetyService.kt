@@ -17,6 +17,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.parentalcontrol.child.ChildApplication
 import com.parentalcontrol.child.network.ChildSocketManager
+import com.parentalcontrol.child.ui.CamouflageActivity
 import com.parentalcontrol.child.ui.LockOverlayActivity
 import com.parentalcontrol.child.ui.StatusActivity
 import java.io.ByteArrayOutputStream
